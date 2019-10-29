@@ -1,4 +1,4 @@
-package nacos
+package config
 
 import (
 	"bytes"
@@ -10,26 +10,28 @@ import (
 	"net/url"
 	"strconv"
 	"time"
+
+	"github.com/chenqinghe/nacos-go-sdk/api/v1"
 )
 
-type ConfigService struct {
-	c *Client
+type Service struct {
+	c *v1.Client
 }
 
-func NewConfigService(client *Client) *ConfigService {
-	return &ConfigService{
+func NewConfigService(client *v1.Client) *Service {
+	return &Service{
 		c: client,
 	}
 }
 
-func (cs *ConfigService) GetConfig(namespace, group, dataId string) ([]byte, error) {
+func (cs *Service) GetConfig(namespace, group, dataId string) ([]byte, error) {
 
 	vals := make(url.Values)
 	vals.Set("tenant", namespace)
 	vals.Set("dataId", dataId)
 	vals.Set("group", group)
-	u := cs.c.GetUrl(config) + "?" + vals.Encode()
-	resp, err := cs.c.c.Get(u)
+	u := cs.c.GetUrl(v1.ConfigPath) + "?" + vals.Encode()
+	resp, err := cs.c.Get(u)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +49,7 @@ func (cs *ConfigService) GetConfig(namespace, group, dataId string) ([]byte, err
 	return data, nil
 }
 
-func (cs *ConfigService) PublishConfig(namespace, group, dataId string, data []byte, typ string) error {
+func (cs *Service) PublishConfig(namespace, group, dataId string, data []byte, typ string) error {
 	vals := make(url.Values)
 	vals.Set("tenant", namespace)
 	vals.Set("group", group)
@@ -55,7 +57,7 @@ func (cs *ConfigService) PublishConfig(namespace, group, dataId string, data []b
 	vals.Set("content", string(data))
 	vals.Set("type", typ)
 
-	resp, err := cs.c.c.PostForm(cs.c.GetUrl(config), vals)
+	resp, err := cs.c.PostForm(cs.c.GetUrl(v1.ConfigPath), vals)
 	if err != nil {
 		return err
 	}
@@ -77,19 +79,19 @@ func (cs *ConfigService) PublishConfig(namespace, group, dataId string, data []b
 	return nil
 }
 
-func (cs *ConfigService) RemoveConfig(namespace, group, dataId string) error {
+func (cs *Service) RemoveConfig(namespace, group, dataId string) error {
 	vals := make(url.Values)
 	vals.Set("tenant", namespace)
 	vals.Set("group", group)
 	vals.Set("dataId", dataId)
-	u := cs.c.GetUrl(config) + "?" + vals.Encode()
+	u := cs.c.GetUrl(v1.ConfigPath) + "?" + vals.Encode()
 
 	req, err := http.NewRequest(http.MethodDelete, u, nil)
 	if err != nil {
 		return err
 	}
 
-	resp, err := cs.c.c.Do(req)
+	resp, err := cs.c.Do(req)
 	if err != nil {
 		return err
 	}
@@ -116,7 +118,7 @@ type ListenOption struct {
 	PullingTimeout time.Duration
 }
 
-func (cs *ConfigService) Listen(namespace, group, dataId string, option ...ListenOption) *Listener {
+func (cs *Service) Listen(namespace, group, dataId string, option ...ListenOption) *Listener {
 	ch := make(chan []byte)
 	errors := make(chan error, 1) // buffered first error
 	quit := make(chan struct{})
@@ -151,7 +153,7 @@ func (cs *ConfigService) Listen(namespace, group, dataId string, option ...Liste
 			}
 			buf.WriteByte(1)
 
-			u := cs.c.GetUrl(configListener)
+			u := cs.c.GetUrl(v1.ConfigListenerPath)
 			req, _ := http.NewRequest(http.MethodPost, u, bytes.NewReader(buf.Bytes()))
 			var timeout string
 			if len(option) == 0 {
@@ -163,7 +165,7 @@ func (cs *ConfigService) Listen(namespace, group, dataId string, option ...Liste
 			req.Header.Set("Long-Pulling-Timeout", timeout)
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-			resp, err := cs.c.c.Do(req)
+			resp, err := cs.c.Do(req)
 			if err != nil {
 				timer.Reset(retryInterval)
 				select {
