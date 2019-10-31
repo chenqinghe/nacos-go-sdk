@@ -1,6 +1,9 @@
 package discovery
 
 import (
+	"time"
+
+	"github.com/rfyiamcool/go-timewheel"
 	"github.com/chenqinghe/nacos-go-sdk/api/v1"
 	"github.com/chenqinghe/nacos-go-sdk/api/v1/naming"
 	"github.com/chenqinghe/nacos-go-sdk/discovery/lb"
@@ -36,6 +39,12 @@ type nacosDiscovery struct {
 	snapshot      Snapshoter
 	lbStrategy    lb.Strategy
 	logger        Logger
+
+	tw *timewheel.TimeWheel
+
+	// TODO: concurrent access protect
+	registeredInstances map[string]*Instance
+	tasks               map[string]*timewheel.Task
 }
 
 var _ Discovery = (*nacosDiscovery)(nil)
@@ -48,11 +57,15 @@ type Logger interface {
 }
 
 func NewNacosDiscovery(c *v1.Client, options ...Option) *nacosDiscovery {
+	tw, _ := timewheel.NewTimeWheel(time.Second, 3600)
+	tw.Start()
+
 	nd := &nacosDiscovery{
 		namingService: naming.NewNamingService(c),
 		snapshot:      nil,
 		lbStrategy:    lb.NewRandom(),
 		logger:        nil,
+		tw:            tw,
 	}
 
 	for _, opt := range options {
@@ -83,28 +96,36 @@ func SetLogger(logger Logger) Option {
 }
 
 func (d *nacosDiscovery) RegisterInstance(instance *Instance) error {
+	d.registeredInstances[instance.ServiceName] = instance
 	err := d.namingService.RegisterInstance(instance)
 	if err != nil {
 		return err
 	}
 
-	go func() {
-		for {
-			_, err := d.namingService.Heartbeat(instance)
-			if err != nil {
-				if d.logger != nil {
-					d.logger.Errorf("send heartbeat error:%s\n", err)
-				}
-				return
+	// TODO: 根据服务端返回的时间间隔发送心跳
+	task := d.tw.Add(time.Second*5, func() {
+		_, err := d.namingService.Heartbeat(instance)
+		if err != nil {
+			if d.logger != nil {
+				d.logger.Errorf("send heartbeat error:%s\n", err)
 			}
-			// TODO: stop when deregister
 		}
-	}()
+	})
+
+	d.registeredInstances[instance.Key()] = instance
+	d.tasks[instance.Key()] = task
 
 	return nil
 }
 
 func (d *nacosDiscovery) DeregisterInstance(instance *Instance) error {
+	key := instance.Key()
+	task := d.tasks[key]
+	delete(d.tasks, key)
+	delete(d.registeredInstances, key)
+
+	d.tw.Remove(task)
+
 	return d.namingService.DeregisterInstance(instance)
 }
 

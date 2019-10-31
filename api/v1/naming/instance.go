@@ -35,6 +35,14 @@ type Instance struct {
 	Ephemeral   bool     `json:"ephemeral"`
 }
 
+func (i *Instance) Key() string {
+	if i.Id != "" {
+		return i.Id
+	}
+
+	return fmt.Sprintf("%s-%s-%s-%s-%d", i.Namespace, i.ServiceName, i.GroupName, i.Ip, i.Port)
+}
+
 type Metadata map[string]interface{}
 
 func (m Metadata) String() string {
