@@ -168,6 +168,7 @@ type GetInstanceOption struct {
 	NamespaceId string
 	Clusters    []string
 	HealthyOnly bool
+	Ephemeral   bool
 }
 
 type node struct {
@@ -246,6 +247,53 @@ func (ns *Client) GetInstances(serviceName string, option *GetInstanceOption) ([
 	}
 
 	return instances, nil
+}
+
+func (ns *Client) GetInstance(serviceName string, ip, port string, option *GetInstanceOption) (Instance, error) {
+	values := make(url.Values)
+	values.Set("serviceName", serviceName)
+	values.Set("ip", ip)
+	values.Set("port", port)
+
+	if option != nil {
+		if option.GroupName != "" {
+			values.Set("groupName", option.GroupName)
+		}
+		if option.NamespaceId != "" {
+			values.Set("namespaceId", option.NamespaceId)
+		}
+		if len(option.Clusters) > 0 {
+			values.Set("clusters", strings.Join(option.Clusters, ","))
+		}
+		if option.HealthyOnly {
+			values.Set("healthyOnly", "true")
+		}
+		if option.Ephemeral {
+			values.Set("ephemeral", "true")
+		}
+	}
+
+	resp, err := ns.c.Get(v1.JoinUrlQueryString(ns.c.GetUrl(v1.InstancePath), values))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("http response code not ok: %d, body:%s", resp.StatusCode, v1.ReadResponseBody(resp.Body))
+	}
+
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var nd node
+	if err := json.Unmarshal(data, &nd); err != nil {
+		return nil, err
+	}
+
+	return &nd, nil
 }
 
 func (ns *Client) Heartbeat(instance Instance) (time.Duration, error) {
