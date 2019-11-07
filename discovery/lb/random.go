@@ -1,8 +1,8 @@
 package lb
 
 import (
-	"github.com/chenqinghe/nacos-go-sdk/discovery"
 	"math/rand"
+	"reflect"
 	"time"
 )
 
@@ -17,6 +17,8 @@ func NewRandom(seed ...int64) *Random {
 	return &Random{r: rand.New(rand.NewSource(seed[0]))}
 }
 
-func (r *Random) Select(instances []*discovery.Instance) *discovery.Instance {
-	return instances[r.r.Intn(len(instances))]
+func (r *Random) Select(instances interface{}) interface{} {
+	v := reflect.ValueOf(instances)
+
+	return v.Index(r.r.Intn(v.Len())).Interface()
 }

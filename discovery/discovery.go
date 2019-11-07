@@ -1,12 +1,11 @@
 package discovery
 
 import (
-	"time"
-
-	"github.com/rfyiamcool/go-timewheel"
-	"github.com/chenqinghe/nacos-go-sdk/api/v1"
+	v1 "github.com/chenqinghe/nacos-go-sdk/api/v1"
 	"github.com/chenqinghe/nacos-go-sdk/api/v1/naming"
 	"github.com/chenqinghe/nacos-go-sdk/discovery/lb"
+	"github.com/rfyiamcool/go-timewheel"
+	"time"
 )
 
 type Discovery interface {
@@ -30,13 +29,38 @@ type Discovery interface {
 	GetInstance(serviceName string) (*Instance, error)
 }
 
-type Instance = naming.Instance
+type Instance struct {
+	Id          string   `json:"instanceId"`
+	Ip          string   `json:"ip"`
+	Port        int      `json:"port"`
+	Namespace   string   `json:"namespace"`
+	Weight      float64  `json:"weight"`
+	Enable      bool     `json:"enable"`
+	Healthy     bool     `json:"healthy"`
+	Metadata    Metadata `json:"metadata"`
+	ClusterName string   `json:"clusterName"`
+	ServiceName string   `json:"serviceName"`
+	GroupName   string   `json:"groupName"`
+	Ephemeral   bool     `json:"ephemeral"`
+}
+
+func (i *Instance) GetId() string          { return i.Id }
+func (i *Instance) GetIp() string          { return i.Ip }
+func (i *Instance) GetPort() int           { return i.Port }
+func (i *Instance) GetNamespace() string   { return i.Namespace }
+func (i *Instance) GetWeight() float64     { return i.Weight }
+func (i *Instance) GetEnable() bool        { return i.Enable }
+func (i *Instance) GetHealthy() bool       { return i.Healthy }
+func (i *Instance) GetMetadata() Metadata  { return i.Metadata }
+func (i *Instance) GetClusterName() string { return i.ClusterName }
+func (i *Instance) GetServiceName() string { return i.ServiceName }
+func (i *Instance) GetGroupName() string   { return i.GroupName }
+func (i *Instance) GetEphemeral() bool     { return i.Ephemeral }
 
 type Metadata = naming.Metadata
 
 type nacosDiscovery struct {
 	namingService *naming.Client
-	snapshot      Snapshoter
 	lbStrategy    lb.Strategy
 	logger        Logger
 
@@ -62,7 +86,6 @@ func NewNacosDiscovery(c *v1.Client, options ...Option) *nacosDiscovery {
 
 	nd := &nacosDiscovery{
 		namingService: naming.NewNamingService(c),
-		snapshot:      nil,
 		lbStrategy:    lb.NewRandom(),
 		logger:        nil,
 		tw:            tw,
@@ -76,12 +99,6 @@ func NewNacosDiscovery(c *v1.Client, options ...Option) *nacosDiscovery {
 }
 
 type Option func(discovery *nacosDiscovery)
-
-func SetSnapshot(snapshoter Snapshoter) Option {
-	return func(discovery *nacosDiscovery) {
-		discovery.snapshot = snapshoter
-	}
-}
 
 func SetLBStrategy(strategy lb.Strategy) Option {
 	return func(discovery *nacosDiscovery) {
@@ -112,14 +129,14 @@ func (d *nacosDiscovery) RegisterInstance(instance *Instance) error {
 		}
 	})
 
-	d.registeredInstances[instance.Key()] = instance
-	d.tasks[instance.Key()] = task
+	d.registeredInstances[instance.GetId()] = instance
+	d.tasks[instance.GetId()] = task
 
 	return nil
 }
 
 func (d *nacosDiscovery) DeregisterInstance(instance *Instance) error {
-	key := instance.Key()
+	key := instance.GetId()
 	task := d.tasks[key]
 	delete(d.tasks, key)
 	delete(d.registeredInstances, key)
@@ -134,7 +151,30 @@ func (d *nacosDiscovery) UpdateInstance(instance *Instance) error {
 }
 
 func (d *nacosDiscovery) QueryInstances(serviceName string) ([]*Instance, error) {
-	return d.namingService.GetInstances(serviceName, nil)
+	is,err:= d.namingService.GetInstances(serviceName,nil)
+	if err!=nil {
+		return  nil,err
+	}
+
+	instances:=make([]*Instance,len(is))
+	for k,v:=range is {
+		instances[k] = &Instance{
+			Id:          v.GetId(),
+			Ip:          v.GetIp(),
+			Port:        v.GetPort(),
+			Namespace:   v.GetNamespace(),
+			Weight:      v.GetWeight(),
+			Enable:      v.GetEnable(),
+			Healthy:     v.GetHealthy(),
+			Metadata:    v.GetMetadata(),
+			ClusterName: v.GetClusterName(),
+			ServiceName: v.GetServiceName(),
+			GroupName:   v.GetGroupName(),
+			Ephemeral:   v.GetEphemeral(),
+		}
+	}
+
+	return instances,nil
 }
 
 func (d *nacosDiscovery) GetInstance(serviceName string) (*Instance, error) {
@@ -142,7 +182,23 @@ func (d *nacosDiscovery) GetInstance(serviceName string) (*Instance, error) {
 	if err != nil {
 		return nil, err
 	}
-	return d.lbStrategy.Select(instances), nil
+
+	instance := d.lbStrategy.Select(instances).(naming.Instance)
+
+	return &Instance{
+		Id:          instance.GetId(),
+		Ip:          instance.GetIp(),
+		Port:        instance.GetPort(),
+		Namespace:   instance.GetNamespace(),
+		Weight:      instance.GetWeight(),
+		Enable:      instance.GetEnable(),
+		Healthy:     instance.GetHealthy(),
+		Metadata:    instance.GetMetadata(),
+		ClusterName: instance.GetClusterName(),
+		ServiceName: instance.GetServiceName(),
+		GroupName:   instance.GetGroupName(),
+		Ephemeral:   instance.GetEphemeral(),
+	}, nil
 }
 
 func (d *nacosDiscovery) QueryServices() ([]string, error) {

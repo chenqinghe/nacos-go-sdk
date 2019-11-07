@@ -3,13 +3,14 @@ package naming
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/chenqinghe/nacos-go-sdk/api/v1"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/chenqinghe/nacos-go-sdk/api/v1"
 )
 
 type Client struct {
@@ -20,27 +21,19 @@ func NewNamingService(c *v1.Client) *Client {
 	return &Client{c: c}
 }
 
-type Instance struct {
-	Id          string   `json:"instanceId"`
-	Ip          string   `json:"ip"`
-	Port        int      `json:"port"`
-	Namespace   string   `json:"namespace"`
-	Weight      float64  `json:"weight"`
-	Enable      bool     `json:"enable"`
-	Healthy     bool     `json:"healthy"`
-	Metadata    Metadata `json:"metadata"`
-	ClusterName string   `json:"clusterName"`
-	ServiceName string   `json:"serviceName"`
-	GroupName   string   `json:"groupName"`
-	Ephemeral   bool     `json:"ephemeral"`
-}
-
-func (i *Instance) Key() string {
-	if i.Id != "" {
-		return i.Id
-	}
-
-	return fmt.Sprintf("%s-%s-%s-%s-%d", i.Namespace, i.ServiceName, i.GroupName, i.Ip, i.Port)
+type Instance interface {
+	GetId() string
+	GetIp() string
+	GetPort() int
+	GetNamespace() string
+	GetWeight() float64
+	GetEnable() bool
+	GetHealthy() bool
+	GetMetadata() Metadata
+	GetClusterName() string
+	GetServiceName() string
+	GetGroupName() string
+	GetEphemeral() bool
 }
 
 type Metadata map[string]interface{}
@@ -53,19 +46,19 @@ func (m Metadata) String() string {
 	return string(d)
 }
 
-func (ns *Client) RegisterInstance(instance *Instance) error {
+func (ns *Client) RegisterInstance(instance Instance) error {
 	values := make(url.Values)
-	values.Set("ip", instance.Ip)
-	values.Set("port", strconv.Itoa(instance.Port))
-	values.Set("namespaceId", instance.Namespace)
-	values.Set("weight", strconv.FormatFloat(instance.Weight, 'f', 2, 64))
-	values.Set("enabled", strconv.FormatBool(instance.Enable))
-	values.Set("healthy", strconv.FormatBool(instance.Healthy))
-	values.Set("metadata", instance.Metadata.String())
-	values.Set("clusterName", instance.ClusterName)
-	values.Set("serviceName", instance.ServiceName)
-	values.Set("groupName", instance.GroupName)
-	values.Set("ephemeral", strconv.FormatBool(instance.Ephemeral))
+	values.Set("ip", instance.GetIp())
+	values.Set("port", strconv.Itoa(instance.GetPort()))
+	values.Set("namespaceId", instance.GetNamespace())
+	values.Set("weight", strconv.FormatFloat(instance.GetWeight(), 'f', 2, 64))
+	values.Set("enabled", strconv.FormatBool(instance.GetEnable()))
+	values.Set("healthy", strconv.FormatBool(instance.GetHealthy()))
+	values.Set("metadata", instance.GetMetadata().String())
+	values.Set("clusterName", instance.GetClusterName())
+	values.Set("serviceName", instance.GetServiceName())
+	values.Set("groupName", instance.GetGroupName())
+	values.Set("ephemeral", strconv.FormatBool(instance.GetEphemeral()))
 
 	req, err := http.NewRequest(http.MethodPost, v1.JoinUrlQueryString(ns.c.GetUrl(v1.InstancePath), values), nil)
 	if err != nil {
@@ -93,15 +86,15 @@ func (ns *Client) RegisterInstance(instance *Instance) error {
 	return nil
 }
 
-func (ns *Client) DeregisterInstance(instance *Instance) error {
+func (ns *Client) DeregisterInstance(instance Instance) error {
 	values := make(url.Values)
-	values.Set("ip", instance.Ip)
-	values.Set("port", strconv.Itoa(instance.Port))
-	values.Set("namespaceId", instance.Namespace)
-	values.Set("clusterName", instance.ClusterName)
-	values.Set("serviceName", instance.ServiceName)
-	values.Set("groupName", instance.GroupName)
-	values.Set("ephemeral", strconv.FormatBool(instance.Ephemeral))
+	values.Set("ip", instance.GetIp())
+	values.Set("port", strconv.Itoa(instance.GetPort()))
+	values.Set("namespaceId", instance.GetNamespace())
+	values.Set("clusterName", instance.GetClusterName())
+	values.Set("serviceName", instance.GetServiceName())
+	values.Set("groupName", instance.GetGroupName())
+	values.Set("ephemeral", strconv.FormatBool(instance.GetEphemeral()))
 
 	req, err := http.NewRequest(http.MethodDelete, v1.JoinUrlQueryString(ns.c.GetUrl(v1.InstancePath), values), nil)
 	if err != nil {
@@ -130,19 +123,19 @@ func (ns *Client) DeregisterInstance(instance *Instance) error {
 	return nil
 }
 
-func (ns *Client) UpdateInstance(instance *Instance) error {
+func (ns *Client) UpdateInstance(instance Instance) error {
 	values := make(url.Values)
-	values.Set("ip", instance.Ip)
-	values.Set("port", strconv.Itoa(instance.Port))
-	values.Set("namespaceId", instance.Namespace)
-	values.Set("weight", strconv.FormatFloat(instance.Weight, 'f', 2, 64))
-	values.Set("enabled", strconv.FormatBool(instance.Enable))
-	values.Set("healthy", strconv.FormatBool(instance.Healthy))
-	values.Set("metadata", instance.Metadata.String())
-	values.Set("clusterName", instance.ClusterName)
-	values.Set("serviceName", instance.ServiceName)
-	values.Set("groupName", instance.GroupName)
-	values.Set("ephemeral", strconv.FormatBool(instance.Ephemeral))
+	values.Set("ip", instance.GetIp())
+	values.Set("port", strconv.Itoa(instance.GetPort()))
+	values.Set("namespaceId", instance.GetNamespace())
+	values.Set("weight", strconv.FormatFloat(instance.GetWeight(), 'f', 2, 64))
+	values.Set("enabled", strconv.FormatBool(instance.GetEnable()))
+	values.Set("healthy", strconv.FormatBool(instance.GetHealthy()))
+	values.Set("metadata", instance.GetMetadata().String())
+	values.Set("clusterName", instance.GetClusterName())
+	values.Set("serviceName", instance.GetServiceName())
+	values.Set("groupName", instance.GetGroupName())
+	values.Set("ephemeral", strconv.FormatBool(instance.GetEphemeral()))
 
 	req, err := http.NewRequest(http.MethodPut, v1.JoinUrlQueryString(ns.c.GetUrl(v1.InstancePath), values), nil)
 	if err != nil {
@@ -177,7 +170,35 @@ type GetInstanceOption struct {
 	HealthyOnly bool
 }
 
-func (ns *Client) GetInstances(serviceName string, option *GetInstanceOption) ([]*Instance, error) {
+type node struct {
+	Valid      bool
+	Marked     bool
+	InstanceId string
+	Port       int
+	Ip         string
+	Weight     float64
+	Metadata   Metadata
+
+	clusterName string
+	serviceName string
+	groupName   string
+	namespaceId string
+}
+
+func (i *node) GetId() string          { return i.InstanceId }
+func (i *node) GetIp() string          { return i.Ip }
+func (i *node) GetPort() int           { return i.Port }
+func (i *node) GetNamespace() string   { return i.namespaceId }
+func (i *node) GetWeight() float64     { return i.Weight }
+func (i *node) GetEnable() bool        { return i.Valid }
+func (i *node) GetHealthy() bool       { return i.Valid }
+func (i *node) GetMetadata() Metadata  { return i.Metadata }
+func (i *node) GetClusterName() string { return i.clusterName }
+func (i *node) GetServiceName() string { return i.serviceName }
+func (i *node) GetGroupName() string   { return i.groupName }
+func (i *node) GetEphemeral() bool     { return true }
+
+func (ns *Client) GetInstances(serviceName string, option *GetInstanceOption) ([]Instance, error) {
 	values := make(url.Values)
 	values.Set("serviceName", serviceName)
 
@@ -212,21 +233,26 @@ func (ns *Client) GetInstances(serviceName string, option *GetInstanceOption) ([
 	}
 
 	type Response struct {
-		Hosts []*Instance `json:"hosts"`
+		Hosts []*node `json:"hosts"`
 	}
 	var r Response
 	if err := json.Unmarshal(data, &r); err != nil {
 		return nil, err
 	}
 
-	return r.Hosts, nil
+	instances := make([]Instance, len(r.Hosts))
+	for k := range r.Hosts {
+		instances[k] = r.Hosts[k]
+	}
+
+	return instances, nil
 }
 
-func (ns *Client) Heartbeat(instance *Instance) (time.Duration, error) {
+func (ns *Client) Heartbeat(instance Instance) (time.Duration, error) {
 	values := make(url.Values)
-	values.Set("serviceName", instance.ServiceName)
-	values.Set("groupName", instance.GroupName)
-	values.Set("ephemeral", strconv.FormatBool(instance.Ephemeral))
+	values.Set("serviceName", instance.GetServiceName())
+	values.Set("groupName", instance.GetGroupName())
+	values.Set("ephemeral", strconv.FormatBool(instance.GetEphemeral()))
 
 	beat, err := json.Marshal(instance)
 	if err != nil {
